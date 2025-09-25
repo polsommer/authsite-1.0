@@ -1,196 +1,241 @@
+<?php
+declare(strict_types=1);
+
+require_once __DIR__ . '/includes/security.php';
+require_once __DIR__ . '/includes/db_connect.php';
+
+ensureSessionStarted();
+$config = require __DIR__ . '/includes/config.php';
+
+$serverHost = getenv('SWG_SERVER_HOST') ?: '127.0.0.1';
+$loginPort = (int) (getenv('SWG_LOGIN_PORT') ?: 44453);
+$gamePort = (int) (getenv('SWG_GAME_PORT') ?: 44463);
+$mysqlPort = (int) (getenv('SWG_MYSQL_PORT') ?: 3306);
+$timeoutSeconds = (int) (getenv('SWG_PORT_TIMEOUT') ?: 5);
+
+function checkService(string $host, int $port, int $timeout): bool
+{
+    $connection = @fsockopen($host, $port, $errno, $errstr, $timeout);
+    if (is_resource($connection)) {
+        fclose($connection);
+        return true;
+    }
+
+    return false;
+}
+
+$loginOnline = checkService($serverHost, $loginPort, $timeoutSeconds);
+$gameOnline = checkService($serverHost, $gamePort, $timeoutSeconds);
+$mysqlOnline = checkService($serverHost, $mysqlPort, $timeoutSeconds);
+
+$onlinePlayers = null;
+try {
+    $stmt = $mysqli->query('SELECT COUNT(*) AS online_count FROM characters WHERE online = 1');
+    $row = $stmt->fetch_assoc();
+    $onlinePlayers = isset($row['online_count']) ? (int) $row['online_count'] : null;
+} catch (Throwable $exception) {
+    $onlinePlayers = null;
+}
+?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>SWG Source Server Main Page</title>
-<link rel="stylesheet" type="text/css"href="stylesheet.css">
-<meta name="viewport" content="width=device-width">
-<meta name="viewport" content="initial-scale=1">
-<script type="text/javascript" language="JavaScript">
-<!--
-
-function BothFieldsIdenticalCaseSensitive() {
-var one = document.NewUser.realpassword.value;
-var another = document.NewUser.confirmpassword.value;
-if(one == another) { return true; }
-alert("Password fields must be the same.");
-return false;
-}
-//-->
-</script>
+<title><?php echo htmlspecialchars($config['site_name'], ENT_QUOTES, 'UTF-8'); ?> Command Center</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-div.container {
-    width: 90%;
-    border: none;
-}
+    body {
+        margin: 0;
+        background-color: #000;
+        background-image: url("/images/stormtrooper.jpg");
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+        background-position: center;
+        background-size: cover;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #e2e8f0;
+    }
 
-header, footer {
-    padding: 1em;
-    color: white;
-    background-color: none;
-    clear: left;
-    text-align: center;
-}
+    .container {
+        background: linear-gradient(180deg, rgba(2, 6, 23, 0.8) 0%, rgba(2, 6, 23, 0.6) 100%);
+        min-height: 100vh;
+    }
 
-nav {
-    float: left;
-    max-width: 160px;
-    margin: 0;
-    padding: 1em;
-}
+    header {
+        padding: 2.5rem 1.5rem 2rem;
+        text-align: center;
+        color: #f8fafc;
+    }
 
-nav ul {
-    list-style-type: none;
-    padding: 0;
-}
-   
-nav ul a {
-    text-decoration: none;
-}
+    header h1 {
+        margin: 0;
+        font-size: 2.6rem;
+        letter-spacing: 0.12em;
+    }
 
-article {
-    margin-left: 170px;
-    border-left: none;
-    padding: 1em;
-    overflow: hidden;
-}
-body  {
-    background-color: black;
-    background-image: url("/images/stormtrooper.jpg");
-    background-repeat: no-repeat;
-    background-attachment: fixed;
-    background-position: center;
-    background-size: cover;
-}
-a:link {
-    color: green;
-    background-color: transparent;
-    text-decoration: none;
-}
-a:visited {
-    color: orange;
-    background-color: transparent;
-    text-decoration: none;
-}
-a:hover {
-    color: red;
-    background-color: transparent;
-    text-decoration: underline;
-}
-a:active {
-    color: yellow;
-    background-color: transparent;
-    text-decoration: underline;
-}    
+    header p {
+        margin: 0.35rem 0 0;
+        font-size: 1.05rem;
+        color: #cbd5e1;
+    }
+
+    nav {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+
+    nav a {
+        color: #38bdf8;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-decoration: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 999px;
+        border: 1px solid rgba(56, 189, 248, 0.35);
+        background: rgba(15, 23, 42, 0.6);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    nav a:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 18px 35px rgba(56, 189, 248, 0.25);
+    }
+
+    main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 0 1.5rem 3rem;
+    }
+
+    .status-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.5rem;
+        margin-top: 3rem;
+    }
+
+    .status-card {
+        background: rgba(15, 23, 42, 0.85);
+        border-radius: 16px;
+        padding: 1.75rem;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        text-align: center;
+        box-shadow: 0 25px 45px rgba(2, 6, 23, 0.45);
+    }
+
+    .status-card h2 {
+        margin-top: 0;
+        font-size: 1.2rem;
+        letter-spacing: 0.08em;
+        color: #f8fafc;
+    }
+
+    .status-indicator {
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-top: 0.75rem;
+    }
+
+    .status-indicator.online {
+        color: #4ade80;
+    }
+
+    .status-indicator.offline {
+        color: #f87171;
+    }
+
+    .players-online {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-top: 0.5rem;
+        color: #facc15;
+    }
+
+    footer {
+        padding: 2rem 1rem;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 0.9rem;
+    }
+
+    .audio-controls {
+        margin-top: 2rem;
+        text-align: center;
+    }
+
+    .audio-controls audio {
+        width: 100%;
+        max-width: 320px;
+    }
 </style>
 </head>
 <body>
-
 <div class="container">
+    <header>
+        <h1>Welcome to <?php echo htmlspecialchars($config['site_name'], ENT_QUOTES, 'UTF-8'); ?></h1>
+        <p>Secure authentication gateway for our Star Wars Galaxies community.</p>
+        <nav>
+            <span><?php if (isset($_SESSION['user'])) { echo 'Hello ' . htmlspecialchars($_SESSION['user'], ENT_QUOTES, 'UTF-8'); } ?></span>
+            <a href="/index.php">Home</a>
+            <a href="/forums/index.php">Forums</a>
+            <?php if (isset($_SESSION['user'])) : ?>
+                <a href="/changepassword.php">Change Password</a>
+                <a href="/logout.php">Logout</a>
+            <?php else : ?>
+                <a href="/form_login.php">Account Login</a>
+                <a href="/addnewuser.php">Register</a>
+            <?php endif; ?>
+            <a href="http://www.swgsource.com" target="_blank" rel="noopener">SWG Source</a>
+            <a href="https://discord.gg" target="_blank" rel="noopener">Discord Command</a>
+            <a href="http://www.swgcraft.co.uk" target="_blank" rel="noopener">SWG Craft</a>
+            <a href="http://www.galaxyharvester.net" target="_blank" rel="noopener">Galaxy Harvester</a>
+        </nav>
+    </header>
 
-<header>
+    <main>
+        <div class="audio-controls">
+            <audio controls preload="none">
+                <source src="/music/Star Wars Main Theme.mp3" type="audio/mpeg">
+            </audio>
+        </div>
 
-<nav>
-  <ul>
-	<?php
-	session_start();
-	if(isset($_SESSION['user'])) {
-		echo "Hello ".$_SESSION['user']; //display logged in username
-	}
-	?>
-    <li><b><a href="/index.php">Home</a></b></li>
-    <li><b><a href="/forums/index.php">Forums</a></b></li><br>
-	<?php
-	if(isset($_SESSION['user'])) {
-		echo '    <li><b><a href="/changepassword.php">Change Account Password</a></b></li><br>'; //logged in - show password option and logout
-		echo '    <li><b><a href="/logout.php">Logout</a></b></li><br>';
-	}
-	else
-	{
-		echo '    <li><b><a href="/form_login.php">Account Management</a></b></li><br>'; //not logged in - display login url
-	}
-	?>
-    <p><b><u>Useful Links</u></b></p>
-    <li><b><a href="http://www.swgsource.com">SWG Source</a></b></li>
-    <li><b><a href="https://discordapp.com/channels/366560008068005892/366560008608940035">SWG Source Discord Server</a></b></li>
-    <li><b><a href="#">Stella Bellum</a></b></li>
-    <li><b><a href="http://www.swgpets.com">SWG Pets</a></b></li>
-    <li><b><a href="http://www.swgcraft.co.uk">SWG Craft</a></b></li>
-    <li><b><a href="http://www.galaxyharvester.net">Galaxy Harvester</a></b></li>
-    <li><b><a href="http://www.swgjunkyard.com">SWG Junkyard</a></b></li>
-    <li><b><a href="http://www.swgtools.com">SWG Tools</a></b></li>
-    <li><b><a href="#">SWG City Planner</a></b></li>
-    <li><b><a href="#">SWG Activeframe</a></b></li>
-  </ul>
-</nav>
-	
-<audio muted autoplay id="myaudio">
-  <source src="/music/Star Wars Main Theme.mp3">
-</audio>
-	
-<script>
-  var audio = document.getElementById("myaudio");
-  audio.volume = 0.3;
-</script>
-   <center><h1><b>WELCOME</b></h1>
-   <p><b>to</b></p>
-   <p><b>SWG Source Server v2.2</b></p>
-   <p><b>This is the Login frontend for your NGE server</b></p>
-   <p><b>Click below to Create a New Account</b></p>
-   <p><b><a href="/addnewuser.php"><u>Register an Account</u></a></b></p></center>
-</header>
-  
+        <section class="status-grid">
+            <div class="status-card">
+                <h2>Login Server</h2>
+                <div class="status-indicator <?php echo $loginOnline ? 'online' : 'offline'; ?>">
+                    <?php echo $loginOnline ? 'Online' : 'Offline'; ?>
+                </div>
+            </div>
+            <div class="status-card">
+                <h2>Game Server</h2>
+                <div class="status-indicator <?php echo $gameOnline ? 'online' : 'offline'; ?>">
+                    <?php echo $gameOnline ? 'Online' : 'Offline'; ?>
+                </div>
+            </div>
+            <div class="status-card">
+                <h2>Database</h2>
+                <div class="status-indicator <?php echo $mysqlOnline ? 'online' : 'offline'; ?>">
+                    <?php echo $mysqlOnline ? 'Online' : 'Offline'; ?>
+                </div>
+            </div>
+            <div class="status-card">
+                <h2>Pilots in the Galaxy</h2>
+                <?php if ($onlinePlayers !== null) : ?>
+                    <div class="players-online"><?php echo $onlinePlayers; ?></div>
+                <?php else : ?>
+                    <div class="status-indicator offline">Unavailable</div>
+                <?php endif; ?>
+            </div>
+        </section>
+    </main>
 
-<article>
-    <p></p>
-    <p></p>
-    <p></p>
-</article>    
-
-<h1><b><font color='#FFFFFF'><u>Server Status</u></font></b></h1>
-	<div class="status">
-		<div>
-		<table align="center">
-        <?php
-            $server = "127.0.0.1";
-            $portg = "44463";
-            $portl = "44453";
-            $timeout = "5";
-            $portm = "3306";
-            
-            $mysql = @fsockopen("$server", $portm, $errno, $errstr, $timeout);
-            $game = @fsockopen("$server", $portg, $errno, $errstr, $timeout);
-            $login = @fsockopen("$server", $portl, $errno, $errstr, $timeout);
-
-                echo "<tr><td><p><center><strong><font color='#FFFFFF'>Login Server: </font></strong>";
-                echo $login ? "<font color=\"green\">Online</font>" : "<font color=\"red\">Offline</font></p></center></td></tr>";
-                echo "<tr><td><p><center><strong><font color='#FFFFFF'>Game Server: </font></strong>";
-                echo $game ? "<font color=\"green\">Online</font>" : "<font color=\"red\">Offline</font></p></center></td></tr>";
-        ?>
-		</table>
-		</div>
-	</div>
-
-<center>
-<?php
-//first you need to define db info
-  define('mySQL_hostname', '127.0.0.1');  //database IP
-  define('mySQL_database', 'swgusers');  //database name
-  define('mySQL_username', 'root');  //database user
-  define('mySQL_password', 'swg');  //database password
-//connects to mysql
-  $db_link = mysql_pconnect( mySQL_hostname, mySQL_username, mySQL_password )
-    or die( 'Error connecting to mysql<br><br>'.mysql_error() );
-//connects to Database
-  $db_select = mysql_select_db( mySQL_database, $db_link )
-    or die( 'Error connecting to Database<br><br>'.mysql_error() );
-//selects desired table
-   $chars= mysql_query("SELECT `online` FROM `characters` where `online`=1");
-//tells how much rows are there (will come helpfull with while loops)
-   $rows = mysql_num_rows($chars);
-    echo "<p><strong><font color='#FFFFFF'> Online Players:</font></strong></p><em>".$rows."<em>"; //prints out the $x number of players online
-?>
-</center>
+    <footer>
+        &copy; <?php echo date('Y'); ?> <?php echo htmlspecialchars($config['site_name'], ENT_QUOTES, 'UTF-8'); ?>. All systems monitored by Imperial Security Bureau.
+    </footer>
 </div>
 </body>
 </html>
