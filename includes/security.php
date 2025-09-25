@@ -55,11 +55,51 @@ function currentIpAddress(): string
     return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '0.0.0.0';
 }
 
+function truncateForStorage(string $value, int $length = 250): string
+{
+    $clean = preg_replace('/[\x00-\x1F\x7F]/', '', $value) ?? '';
+    $clean = trim($clean);
+
+    if ($clean === '') {
+        return 'unknown';
+    }
+
+    if (function_exists('mb_substr')) {
+        return mb_substr($clean, 0, $length, 'UTF-8');
+    }
+
+    return substr($clean, 0, $length);
+}
+
+function currentUserAgent(): string
+{
+    $agent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
+    return truncateForStorage($agent);
+}
+
+function networkOwnerFromIp(string $ipAddress): string
+{
+    if (!filter_var($ipAddress, FILTER_VALIDATE_IP)) {
+        return 'unknown';
+    }
+
+    $host = @gethostbyaddr($ipAddress);
+
+    if ($host === false || $host === $ipAddress) {
+        return 'unknown';
+    }
+
+    return truncateForStorage($host);
+}
+
 function logSecurityEvent(mysqli $db, string $action, string $ipAddress): void
 {
     $createdAt = (new DateTimeImmutable('now', new DateTimeZone('UTC')))->format('Y-m-d H:i:s');
-    $stmt = $db->prepare('INSERT INTO auth_events (action, ip_address, created_at) VALUES (?, ?, ?)');
-    $stmt->bind_param('sss', $action, $ipAddress, $createdAt);
+    $userAgent = currentUserAgent();
+    $networkHost = networkOwnerFromIp($ipAddress);
+
+    $stmt = $db->prepare('INSERT INTO auth_events (action, ip_address, user_agent, network_host, created_at) VALUES (?, ?, ?, ?, ?)');
+    $stmt->bind_param('sssss', $action, $ipAddress, $userAgent, $networkHost, $createdAt);
     $stmt->execute();
 }
 
@@ -87,4 +127,37 @@ function purgeOldSecurityEvents(mysqli $db, int $retentionDays = 30): void
     $stmt = $db->prepare('DELETE FROM auth_events WHERE created_at < ?');
     $stmt->bind_param('s', $threshold);
     $stmt->execute();
+}
+
+function findBannedNetwork(mysqli $db, string $ipAddress): ?array
+{
+    if (!filter_var($ipAddress, FILTER_VALIDATE_IP)) {
+        return null;
+    }
+
+    $stmt = $db->prepare('SELECT ip_address, network_host, reason FROM banned_networks WHERE ip_address = ? LIMIT 1');
+    $stmt->bind_param('s', $ipAddress);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $record = $result->fetch_assoc();
+
+    if (!$record) {
+        return null;
+    }
+
+    if (empty($record['network_host']) || $record['network_host'] === 'unknown') {
+        $resolved = networkOwnerFromIp($ipAddress);
+
+        if ($resolved !== 'unknown') {
+            $update = $db->prepare('UPDATE banned_networks SET network_host = ?, updated_at = CURRENT_TIMESTAMP WHERE ip_address = ?');
+            $update->bind_param('ss', $resolved, $ipAddress);
+            $update->execute();
+            $record['network_host'] = $resolved;
+        } else {
+            $record['network_host'] = 'unknown';
+        }
+    }
+
+    return $record;
 }

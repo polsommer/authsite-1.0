@@ -40,14 +40,37 @@ CREATE TABLE `auth_events` (
   `id` int(11) NOT NULL,
   `action` varchar(50) NOT NULL,
   `ip_address` varchar(45) NOT NULL,
+  `user_agent` varchar(255) DEFAULT NULL,
+  `network_host` varchar(255) DEFAULT NULL,
   `created_at` datetime NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 ALTER TABLE `auth_events`
   ADD PRIMARY KEY (`id`),
-  ADD INDEX `idx_action_created` (`action`, `created_at`);
+  ADD INDEX `idx_action_created` (`action`, `created_at`),
+  ADD INDEX `idx_ip_created` (`ip_address`, `created_at`);
 
 ALTER TABLE `auth_events`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+-- --------------------------------------------------------
+-- Table structure for table `banned_networks`
+-- --------------------------------------------------------
+
+CREATE TABLE `banned_networks` (
+  `id` int(11) NOT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `network_host` varchar(255) DEFAULT NULL,
+  `reason` varchar(255) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+ALTER TABLE `banned_networks`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uniq_ip_address` (`ip_address`);
+
+ALTER TABLE `banned_networks`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

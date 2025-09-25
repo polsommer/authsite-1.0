@@ -20,6 +20,16 @@ if (!validateCsrfToken($_POST['csrf_token'] ?? null)) {
 
 purgeOldSecurityEvents($mysqli);
 $ipAddress = currentIpAddress();
+$banRecord = findBannedNetwork($mysqli, $ipAddress);
+
+if ($banRecord) {
+    logSecurityEvent($mysqli, 'ip_blocked', $ipAddress);
+    $banReason = $banRecord['reason'] ?? '';
+    $reasonMessage = $banReason !== '' ? ' Reason: ' . $banReason . '.' : '';
+    renderLoginResponse(['Access from this network has been blocked by ' . $config['site_name'] . ' security.' . $reasonMessage]);
+    exit;
+}
+
 $maxAttempts = max(1, $config['login']['max_attempts'] ?? 10);
 $intervalSeconds = max(60, $config['login']['interval_seconds'] ?? 900);
 

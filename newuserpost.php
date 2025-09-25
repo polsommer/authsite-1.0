@@ -30,6 +30,21 @@ if ($action !== 'create') {
 
 purgeOldSecurityEvents($mysqli);
 $ipAddress = currentIpAddress();
+$banRecord = findBannedNetwork($mysqli, $ipAddress);
+$banReason = $banRecord['reason'] ?? '';
+
+if ($banRecord) {
+    logSecurityEvent($mysqli, 'ip_blocked', $ipAddress);
+    $message = 'Access from this network has been blocked by ' . $config['site_name'] . ' security.';
+
+    if ($banReason !== '') {
+        $message .= ' Reason: ' . $banReason . '.';
+    }
+
+    renderResponse($config, [$message]);
+    exit;
+}
+
 $maxAttempts = max(1, $config['registration']['max_attempts'] ?? 5);
 $intervalSeconds = max(60, $config['registration']['interval_seconds'] ?? 3600);
 

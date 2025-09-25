@@ -12,6 +12,21 @@ require_once __DIR__ . '/includes/auth_functions.php';
 $config = require __DIR__ . '/includes/config.php';
 
 $ipAddress = currentIpAddress();
+$banRecord = findBannedNetwork($mysqli, $ipAddress);
+
+if ($banRecord) {
+    logSecurityEvent($mysqli, 'ip_blocked', $ipAddress);
+    $banReason = $banRecord['reason'] ?? '';
+    $message = 'Access from this network has been blocked by ' . $config['site_name'] . ' security.';
+
+    if ($banReason !== '') {
+        $message .= ' Reason: ' . $banReason . '.';
+    }
+
+    echo json_encode(['message' => $message]);
+    exit;
+}
+
 purgeOldSecurityEvents($mysqli);
 
 $maxAttempts = max(1, $config['login']['max_attempts'] ?? 10);
