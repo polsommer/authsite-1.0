@@ -1,83 +1,70 @@
 <?php
-header('Content-Type: text/html; charset=utf-8');
+declare(strict_types=1);
 
-// #######################################################################
-// ####################### SET PHP ENVIRONMENT ###########################
-// #######################################################################
+header('Content-Type: application/json; charset=utf-8');
 
-#ini_set('display_errors', 1);
-date_default_timezone_set('America/Chicago');
+date_default_timezone_set('UTC');
 
-include 'includes/db_connect.php';
+require_once __DIR__ . '/includes/security.php';
+require_once __DIR__ . '/includes/db_connect.php';
+require_once __DIR__ . '/includes/auth_functions.php';
 
-// #######################################################################
-// ########################### FUNCTIONS #################################
-// #######################################################################
+$config = require __DIR__ . '/includes/config.php';
 
-function getUserByEmailAndPassword($username, $password) {
-	global $mysqli;
-	$result = $mysqli->query("SELECT * FROM user_account WHERE username = '$username'") or die(mysql_error());
-	$no_of_rows = $result->num_rows;
-	if ($no_of_rows > 0) {
-		$result = $result->fetch_array();
-		$salt = $result['password_salt'];
-		$stored_hash = $result['password_hash'];
-		$hashtest = checkhashSSHA($salt, $password);
-		if ($hashtest == $stored_hash) {
-			return $result;
-		}
-	}
-	else {
-		return false;
-	}
+$ipAddress = currentIpAddress();
+purgeOldSecurityEvents($mysqli);
+
+$maxAttempts = max(1, $config['login']['max_attempts'] ?? 10);
+$intervalSeconds = max(60, $config['login']['interval_seconds'] ?? 900);
+
+if (hasExceededRateLimit($mysqli, 'api_auth', $ipAddress, $maxAttempts, $intervalSeconds)) {
+    echo json_encode(['message' => 'Too many authentication attempts. Please slow down.']);
+    exit;
 }
 
-function checkhashSSHA($salt, $password) {
-	$hash = base64_encode(sha1($password . $salt, true) . $salt);
-	return $hash;
+$username = trim((string) ($_POST['user_name'] ?? ''));
+$password = (string) ($_POST['user_password'] ?? '');
+$suid = trim((string) ($_POST['stationID'] ?? ''));
+
+if ($username === '' || $password === '') {
+    logSecurityEvent($mysqli, 'api_auth', $ipAddress);
+    echo json_encode(['message' => 'Username and password are required.']);
+    exit;
 }
 
-// #######################################################################
-// ######################### POST GET ITEMS ##############################
-// #######################################################################
+$user = findUserByUsername($mysqli, $username);
 
-$username = $mysqli->real_escape_string($_POST['user_name']);
-$password = $mysqli->real_escape_string($_POST['user_password']);
-$ip = $_POST['ip'];
-$suid = $_POST['stationID'];
-$user = getUserByEmailAndPassword($username, $password);
-
-// #######################################################################
-// ####################### FINAL GET ID ##################################
-// #######################################################################
-
-if ($user != false) {
-	if($user['accesslevel'] == "banned") {
-		$response['message'] = "Your account has been banned. For further information regarding the ban of your account or to submit a Ban Appeal, contact a member of CSR Staff.";
-	} else {
-		$response['message'] = "success";
-	}
+if (!$user || !verifyPassword($password, $user['password_hash'])) {
+    logSecurityEvent($mysqli, 'api_auth', $ipAddress);
+    echo json_encode(['message' => 'Account does not exist or password was incorrect']);
+    exit;
 }
-else {
-	$response['message'] = "Account does not exist or password was incorrect";
+
+if (!requireVerifiedAccount($user)) {
+    logSecurityEvent($mysqli, 'api_auth', $ipAddress);
+    echo json_encode(['message' => 'Email verification pending']);
+    exit;
 }
-echo json_encode($response);
 
-// #######################################################################
-// ####################### AUTHENTICATION LOGS ###########################
-// #######################################################################
+if (strcasecmp($user['accesslevel'], 'banned') === 0) {
+    logSecurityEvent($mysqli, 'api_auth', $ipAddress);
+    echo json_encode(['message' => 'Your account has been banned. Contact CSR staff for more information.']);
+    exit;
+}
 
-$auth_content = '[' . date('m/d/Y h:i:s a') . '] ' . 'Username: ' . $username . ', Station ID: ' . $suid . ', IP: ' . $ip . "\n";
+logSecurityEvent($mysqli, 'api_auth', $ipAddress);
 
-// To enable logging, give the chdir function the absolute path to your webroot directory and uncomment the following two lines.
-// Also make sure that your apache2 user owns the webroot directory and has write permissions.
+echo json_encode(['message' => 'success']);
 
-#chdir('WEBROOT_DIRECTORY_GOES_HERE'); // If you're running VM 2.1, chdir should be /srv/www/htdocs
-#file_put_contents('logs/auth_log.txt', $auth_content, FILE_APPEND);
+$authContent = sprintf('[%s] Username: %s, Station ID: %s, IP: %s%s',
+    date('m/d/Y h:i:s a'),
+    $username,
+    $suid,
+    $ipAddress,
+    PHP_EOL
+);
+
+// Optional file logging can be re-enabled by configuring filesystem permissions.
+// file_put_contents(__DIR__ . '/logs/auth_log.txt', $authContent, FILE_APPEND);
 
 die();
-
-// #######################################################################
-// ####################### END OF FILE ###################################
-// #######################################################################
-?>

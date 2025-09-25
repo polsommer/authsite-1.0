@@ -1,9 +1,16 @@
 <?php
-session_start();
+declare(strict_types=1);
+
+require_once __DIR__ . '/includes/security.php';
+
+ensureSessionStarted();
+
+$_SESSION = [];
+if (ini_get('session.use_cookies')) {
+    $params = session_get_cookie_params();
+    setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+}
+
 session_destroy();
-header("Location: index.php");
-?>
-<html><head>
-<meta name = "viewport" content = "width = device-width">
-<meta name = "viewport" content = "initial-scale = 1.0">
-</head></html>
+header('Location: index.php');
+exit;
