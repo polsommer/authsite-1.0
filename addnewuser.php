@@ -158,8 +158,8 @@ $config = require __DIR__ . '/includes/config.php';
             </div>
             <div class="form-group">
                 <label for="realpassword">Password</label>
-                <input type="password" id="realpassword" name="realpassword" required autocomplete="new-password" minlength="12">
-                <div class="requirements">Minimum 12 characters including uppercase, lowercase, number and symbol.</div>
+                <input type="password" id="realpassword" name="realpassword" required autocomplete="new-password" minlength="5">
+                <div class="requirements">Minimum 5 characters including uppercase, lowercase, number and symbol.</div>
             </div>
             <div class="form-group">
                 <label for="confirmpassword">Confirm Password</label>

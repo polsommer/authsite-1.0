@@ -318,7 +318,7 @@ try {
 <div class="container">
     <header>
         <h1>Welcome to <?php echo htmlspecialchars($config['site_name'], ENT_QUOTES, 'UTF-8'); ?></h1>
-        <p>Dive into SWG+ — the ultimate Star Wars Galaxies experience with custom content, curated events, and a passionate community ready to explore the stars with you.</p>
+        <p>Dive into SWG+ â€” the ultimate Star Wars Galaxies experience with custom content, curated events, and a passionate community ready to explore the stars with you.</p>
         <nav>
             <?php if (isAuthenticated()) : ?>
                 <span class="nav-greeting">Greetings, <?php echo htmlspecialchars(currentDisplayName(), ENT_QUOTES, 'UTF-8'); ?></span>
