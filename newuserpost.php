@@ -104,9 +104,12 @@ if (!empty($errors)) {
 $passwordHash = password_hash($password, PASSWORD_DEFAULT);
 $verificationToken = bin2hex(random_bytes(32));
 $accessLevel = 'standard';
+$displayName = $username;
+$defaultFaction = 'Independent';
+$defaultActivity = 'Explorer';
 
-$stmt = $mysqli->prepare('INSERT INTO user_account (accesslevel, username, email, password_hash, email_verification_token) VALUES (?, ?, ?, ?, ?)');
-$stmt->bind_param('sssss', $accessLevel, $username, $email, $passwordHash, $verificationToken);
+$stmt = $mysqli->prepare('INSERT INTO user_account (accesslevel, username, display_name, email, password_hash, email_verification_token, faction, favorite_activity) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+$stmt->bind_param('ssssssss', $accessLevel, $username, $displayName, $email, $passwordHash, $verificationToken, $defaultFaction, $defaultActivity);
 $stmt->execute();
 
 logSecurityEvent($mysqli, 'register', $ipAddress);

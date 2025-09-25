@@ -6,12 +6,8 @@ require_once __DIR__ . '/includes/db_connect.php';
 require_once __DIR__ . '/includes/auth_functions.php';
 
 ensureSessionStarted();
+requireAuthenticatedUser('/changepassword.php');
 $config = require __DIR__ . '/includes/config.php';
-
-if (!isset($_SESSION['user'])) {
-    header('Location: form_login.php');
-    exit;
-}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: changepassword.php');
