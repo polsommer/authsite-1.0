@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/includes/security.php';
 require_once __DIR__ . '/includes/db_connect.php';
+require_once __DIR__ . '/includes/server_status.php';
 
 ensureSessionStarted();
 $config = require __DIR__ . '/includes/config.php';
@@ -13,20 +14,15 @@ $gamePort = (int) (getenv('SWG_GAME_PORT') ?: 44463);
 $mysqlPort = (int) (getenv('SWG_MYSQL_PORT') ?: 3306);
 $timeoutSeconds = (int) (getenv('SWG_PORT_TIMEOUT') ?: 5);
 
-function checkService(string $host, int $port, int $timeout): bool
-{
-    $connection = @fsockopen($host, $port, $errno, $errstr, $timeout);
-    if (is_resource($connection)) {
-        fclose($connection);
-        return true;
-    }
+$statuses = resolveServerStatuses($serverHost, $timeoutSeconds, [
+    'login' => $loginPort,
+    'game' => $gamePort,
+    'database' => $mysqlPort,
+]);
 
-    return false;
-}
-
-$loginOnline = checkService($serverHost, $loginPort, $timeoutSeconds);
-$gameOnline = checkService($serverHost, $gamePort, $timeoutSeconds);
-$mysqlOnline = checkService($serverHost, $mysqlPort, $timeoutSeconds);
+$loginOnline = $statuses['login'] ?? false;
+$gameOnline = $statuses['game'] ?? false;
+$mysqlOnline = $statuses['database'] ?? false;
 
 $onlinePlayers = null;
 try {
@@ -86,6 +82,17 @@ try {
         justify-content: center;
         gap: 1rem;
         margin-top: 2rem;
+    }
+
+    .nav-greeting {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.5rem 1rem;
+        border-radius: 999px;
+        background: rgba(56, 189, 248, 0.12);
+        color: #bae6fd;
+        font-weight: 600;
+        letter-spacing: 0.08em;
     }
 
     nav a {
@@ -155,6 +162,52 @@ try {
         color: #facc15;
     }
 
+    .intel-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin-top: 3rem;
+    }
+
+    .intel-card {
+        background: rgba(15, 23, 42, 0.88);
+        border-radius: 16px;
+        padding: 1.75rem;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        box-shadow: 0 22px 40px rgba(2, 6, 23, 0.45);
+    }
+
+    .intel-card h3 {
+        margin-top: 0;
+        letter-spacing: 0.08em;
+        color: #f8fafc;
+    }
+
+    .intel-card p {
+        color: #cbd5e1;
+        line-height: 1.6;
+    }
+
+    .intel-card ul {
+        list-style: none;
+        padding: 0;
+        margin: 1rem 0 0;
+        color: #e2e8f0;
+    }
+
+    .intel-card li {
+        margin-bottom: 0.5rem;
+        padding-left: 1.2rem;
+        position: relative;
+    }
+
+    .intel-card li::before {
+        content: '\2726';
+        position: absolute;
+        left: 0;
+        color: #38bdf8;
+    }
+
     footer {
         padding: 2rem 1rem;
         text-align: center;
@@ -179,16 +232,18 @@ try {
         <h1>Welcome to <?php echo htmlspecialchars($config['site_name'], ENT_QUOTES, 'UTF-8'); ?></h1>
         <p>Secure authentication gateway for our Star Wars Galaxies community.</p>
         <nav>
-            <span><?php if (isset($_SESSION['user'])) { echo 'Hello ' . htmlspecialchars($_SESSION['user'], ENT_QUOTES, 'UTF-8'); } ?></span>
-            <a href="/index.php">Home</a>
-            <a href="/forums/index.php">Forums</a>
-            <?php if (isset($_SESSION['user'])) : ?>
+            <?php if (isAuthenticated()) : ?>
+                <span class="nav-greeting">Greetings, <?php echo htmlspecialchars(currentDisplayName(), ENT_QUOTES, 'UTF-8'); ?></span>
+                <a href="/dashboard.php">Dashboard</a>
+                <a href="/profile.php">My Profile</a>
                 <a href="/changepassword.php">Change Password</a>
                 <a href="/logout.php">Logout</a>
             <?php else : ?>
                 <a href="/form_login.php">Account Login</a>
                 <a href="/addnewuser.php">Register</a>
             <?php endif; ?>
+            <a href="/index.php">Home</a>
+            <a href="/forums/index.php">Forums</a>
             <a href="http://www.swgsource.com" target="_blank" rel="noopener">SWG Source</a>
             <a href="https://discord.gg" target="_blank" rel="noopener">Discord Command</a>
             <a href="http://www.swgcraft.co.uk" target="_blank" rel="noopener">SWG Craft</a>
@@ -229,6 +284,36 @@ try {
                 <?php else : ?>
                     <div class="status-indicator offline">Unavailable</div>
                 <?php endif; ?>
+            </div>
+        </section>
+
+        <section class="intel-grid">
+            <div class="intel-card">
+                <h3>Launch the SWG+ Dashboard</h3>
+                <p>Chart your journey with personalized intel, activity logs, and quick links into every corner of the galaxy.</p>
+                <ul>
+                    <li>Live account insights and quick actions</li>
+                    <li>Curated mission ideas to inspire your next session</li>
+                    <li>Server diagnostics refreshed every visit</li>
+                </ul>
+            </div>
+            <div class="intel-card">
+                <h3>Showcase Your Legend</h3>
+                <p>Craft a rich pilot profile with avatars, biographies, and social call signs so squad mates can recognize you instantly.</p>
+                <ul>
+                    <li>Highlight your favourite faction and playstyle</li>
+                    <li>Share contact handles for squad coordination</li>
+                    <li>Set a heroic display name across the site</li>
+                </ul>
+            </div>
+            <div class="intel-card">
+                <h3>Community Ready</h3>
+                <p>Plug into the wider SWG+ network with one-click access to forums, crafting utilities, and galactic intel feeds.</p>
+                <ul>
+                    <li>Navigate seamlessly between every command hub</li>
+                    <li>Stay informed with trusted external tools</li>
+                    <li>Sync up with allies via our Discord command center</li>
+                </ul>
             </div>
         </section>
     </main>

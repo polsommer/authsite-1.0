@@ -14,10 +14,18 @@ CREATE TABLE `user_account` (
   `user_id` int(11) NOT NULL,
   `accesslevel` varchar(255) NOT NULL DEFAULT 'standard',
   `username` varchar(255) NOT NULL,
+  `display_name` varchar(255) DEFAULT NULL,
   `email` varchar(255) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `email_verification_token` varchar(255) DEFAULT NULL,
   `email_verified_at` datetime DEFAULT NULL,
+  `faction` varchar(100) DEFAULT NULL,
+  `favorite_activity` varchar(100) DEFAULT NULL,
+  `timezone` varchar(64) DEFAULT NULL,
+  `discord_handle` varchar(100) DEFAULT NULL,
+  `avatar_url` varchar(255) DEFAULT NULL,
+  `biography` text,
+  `last_login_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
