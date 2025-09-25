@@ -45,6 +45,59 @@ function validateCsrfToken(?string $token): bool
     return hash_equals($_SESSION['csrf_token'], $token);
 }
 
+function isAuthenticated(): bool
+{
+    ensureSessionStarted();
+
+    return isset($_SESSION['user_id']) && is_numeric($_SESSION['user_id']);
+}
+
+function requireAuthenticatedUser(?string $intendedUrl = null): void
+{
+    ensureSessionStarted();
+
+    if (isAuthenticated()) {
+        return;
+    }
+
+    $requested = $intendedUrl ?? ($_SERVER['REQUEST_URI'] ?? '/index.php');
+    $_SESSION['urlredirect'] = $requested;
+    header('Location: /form_login.php');
+    exit;
+}
+
+function currentUserId(): ?int
+{
+    ensureSessionStarted();
+
+    return isset($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null;
+}
+
+function refreshAuthenticatedSession(array $user): void
+{
+    ensureSessionStarted();
+
+    $_SESSION['user_id'] = (int) ($user['user_id'] ?? 0);
+    $_SESSION['username'] = $user['username'] ?? '';
+    $_SESSION['user'] = $user['username'] ?? '';
+    $_SESSION['accesslevel'] = $user['accesslevel'] ?? 'standard';
+    $displayName = trim((string) ($user['display_name'] ?? ''));
+    $_SESSION['display_name'] = $displayName !== '' ? $displayName : ($user['username'] ?? '');
+}
+
+function currentDisplayName(): string
+{
+    ensureSessionStarted();
+
+    $display = trim((string) ($_SESSION['display_name'] ?? ''));
+    if ($display !== '') {
+        return $display;
+    }
+
+    $username = trim((string) ($_SESSION['username'] ?? $_SESSION['user'] ?? ''));
+    return $username !== '' ? $username : 'Pilot';
+}
+
 function currentIpAddress(): string
 {
     $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';

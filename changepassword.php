@@ -6,12 +6,7 @@ require_once __DIR__ . '/includes/db_connect.php';
 require_once __DIR__ . '/includes/auth_functions.php';
 
 ensureSessionStarted();
-
-if (!isset($_SESSION['user'])) {
-    $_SESSION['urlredirect'] = basename($_SERVER['PHP_SELF']);
-    header('Location: form_login.php');
-    exit;
-}
+requireAuthenticatedUser('/changepassword.php');
 
 $csrfToken = getCsrfToken();
 $config = require __DIR__ . '/includes/config.php';

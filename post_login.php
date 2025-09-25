@@ -70,10 +70,8 @@ if (strcasecmp($user['accesslevel'], 'banned') === 0) {
 logSecurityEvent($mysqli, 'login', $ipAddress);
 session_regenerate_id(true);
 
-$_SESSION['user_id'] = (int) $user['user_id'];
-$_SESSION['user'] = $user['username'];
-$_SESSION['username'] = $user['username'];
-$_SESSION['accesslevel'] = $user['accesslevel'];
+refreshAuthenticatedSession($user);
+updateLastLogin($mysqli, (int) $user['user_id']);
 
 if (isset($_SESSION['urlredirect']) && $_SESSION['urlredirect'] !== '') {
     $redirectName = $_SESSION['urlredirect'];
@@ -82,7 +80,7 @@ if (isset($_SESSION['urlredirect']) && $_SESSION['urlredirect'] !== '') {
     exit;
 }
 
-header('Location: index.php');
+header('Location: dashboard.php');
 exit;
 
 function renderLoginResponse(array $errors): void
