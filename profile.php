@@ -61,6 +61,7 @@ $selectedTimezone = $user['timezone'] ?: 'UTC';
 $discordHandle = trim((string) ($user['discord_handle'] ?? ''));
 $avatarUrl = trim((string) ($user['avatar_url'] ?? ''));
 $biography = trim((string) ($user['biography'] ?? ''));
+$previousAvatarUrl = $avatarUrl;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validateCsrfToken($_POST['csrf_token'] ?? null)) {
@@ -73,6 +74,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $discordHandle = trim((string) ($_POST['discord_handle'] ?? ''));
         $avatarUrl = trim((string) ($_POST['avatar_url'] ?? ''));
         $biography = trim((string) ($_POST['biography'] ?? ''));
+
+        $avatarUpload = $_FILES['avatar_upload'] ?? null;
+        $avatarDirectory = __DIR__ . '/images/avatars';
+        $maxAvatarSize = 2 * 1024 * 1024; // 2MB
+
+        if ($avatarUpload && ($avatarUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            if (($avatarUpload['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+                $errors[] = 'We could not upload your avatar. Please try again.';
+            } elseif (($avatarUpload['size'] ?? 0) > $maxAvatarSize) {
+                $errors[] = 'Avatar files must be 2MB or smaller.';
+            } elseif (!is_uploaded_file($avatarUpload['tmp_name'] ?? '')) {
+                $errors[] = 'Unexpected upload error occurred. Please retry.';
+            } else {
+                $allowedMimes = [
+                    'image/jpeg' => 'jpg',
+                    'image/png' => 'png',
+                    'image/gif' => 'gif',
+                    'image/webp' => 'webp',
+                ];
+
+                try {
+                    $finfo = new finfo(FILEINFO_MIME_TYPE);
+                    $mimeType = $finfo->file($avatarUpload['tmp_name']) ?: '';
+                } catch (Throwable $exception) {
+                    $mimeType = '';
+                }
+
+                if (!array_key_exists($mimeType, $allowedMimes)) {
+                    $errors[] = 'Please upload a JPG, PNG, GIF, or WEBP image.';
+                } else {
+                    if (!is_dir($avatarDirectory)) {
+                        if (!mkdir($avatarDirectory, 0755, true) && !is_dir($avatarDirectory)) {
+                            $errors[] = 'Unable to prepare storage for avatars. Please contact an administrator.';
+                        }
+                    }
+
+                    if (empty($errors)) {
+                        try {
+                            $extension = $allowedMimes[$mimeType];
+                            $randomComponent = bin2hex(random_bytes(6));
+                            $fileName = sprintf('avatar_%d_%s.%s', (int) $userId, $randomComponent, $extension);
+                            $destination = $avatarDirectory . '/' . $fileName;
+
+                            if (!move_uploaded_file($avatarUpload['tmp_name'], $destination)) {
+                                $errors[] = 'We could not save your avatar. Please try again.';
+                            } else {
+                                if ($previousAvatarUrl !== '' && strpos($previousAvatarUrl, '/images/avatars/') === 0) {
+                                    $previousPath = __DIR__ . $previousAvatarUrl;
+                                    if (is_file($previousPath)) {
+                                        @unlink($previousPath);
+                                    }
+                                }
+
+                                $avatarUrl = '/images/avatars/' . $fileName;
+                            }
+                        } catch (Throwable $exception) {
+                            $errors[] = 'We could not process your avatar upload. Please try again.';
+                        }
+                    }
+                }
+            }
+        }
 
         if ($displayName === '' || strlen($displayName) < 3 || strlen($displayName) > 60) {
             $errors[] = 'Display name must be between 3 and 60 characters.';
@@ -95,8 +158,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($avatarUrl !== '') {
-            if (!filter_var($avatarUrl, FILTER_VALIDATE_URL) || !preg_match('/^https?:\/\//i', $avatarUrl)) {
-                $errors[] = 'Avatar URL must be a valid http or https address.';
+            $isLocalAvatar = strpos($avatarUrl, '/images/avatars/') === 0;
+            if (!$isLocalAvatar) {
+                if (!filter_var($avatarUrl, FILTER_VALIDATE_URL) || !preg_match('/^https?:\/\//i', $avatarUrl)) {
+                    $errors[] = 'Avatar URL must be a valid http or https address.';
+                }
             }
         }
 
@@ -127,6 +193,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $csrfToken = getCsrfToken();
+$hasCustomAvatar = $avatarUrl !== '';
+$avatarPreview = $hasCustomAvatar ? $avatarUrl : '/images/swgsource.png';
 ?>
 <!doctype html>
 <html lang="en">
@@ -197,6 +265,28 @@ $csrfToken = getCsrfToken();
         textarea {
             min-height: 140px;
             resize: vertical;
+        }
+
+        .field-hint {
+            margin-top: 0.35rem;
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
+
+        .avatar-preview {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .avatar-preview img {
+            width: 120px;
+            height: 120px;
+            border-radius: 16px;
+            object-fit: cover;
+            border: 2px solid rgba(148, 163, 184, 0.45);
+            box-shadow: 0 12px 22px rgba(15, 23, 42, 0.55);
         }
 
         .actions {
@@ -285,7 +375,7 @@ $csrfToken = getCsrfToken();
             </div>
         <?php endif; ?>
 
-        <form method="post" action="profile.php" novalidate>
+        <form method="post" action="profile.php" enctype="multipart/form-data" novalidate>
             <div class="form-grid">
                 <div>
                     <label for="display_name">Display Name</label>
@@ -322,6 +412,17 @@ $csrfToken = getCsrfToken();
                 <div>
                     <label for="avatar_url">Avatar URL</label>
                     <input type="url" id="avatar_url" name="avatar_url" placeholder="https://example.com/avatar.jpg" value="<?php echo htmlspecialchars($avatarUrl, ENT_QUOTES, 'UTF-8'); ?>">
+                    <p class="field-hint">Paste an image link or upload a new avatar below.</p>
+                </div>
+                <div>
+                    <label for="avatar_upload">Upload Avatar</label>
+                    <input type="file" id="avatar_upload" name="avatar_upload" accept="image/png,image/jpeg,image/gif,image/webp">
+                    <p class="field-hint">Supported formats: JPG, PNG, GIF, WEBP (max 2MB).</p>
+                </div>
+                <div class="avatar-preview">
+                    <label>Current Avatar</label>
+                    <img src="<?php echo htmlspecialchars($avatarPreview, ENT_QUOTES, 'UTF-8'); ?>" alt="Current profile avatar">
+                    <p class="field-hint"><?php echo $hasCustomAvatar ? 'This is your current avatar.' : 'Showing the default avatar until you upload a new one.'; ?></p>
                 </div>
             </div>
             <div style="margin-top: 1.5rem;">
