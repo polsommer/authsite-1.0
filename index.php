@@ -52,8 +52,8 @@ try {
     body {
         margin: 0;
         background-color: #020617;
-        background-image: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.85)),
-            url("/images/mfalcon.jpg");
+        background-image: linear-gradient(140deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.8)),
+            url("/images/vaderdeathstar.jpg");
         background-repeat: no-repeat;
         background-attachment: fixed;
         background-position: center;
@@ -138,16 +138,6 @@ try {
         max-width: 1200px;
         margin: 0 auto;
         padding: 0 1.5rem 4rem;
-    }
-
-    .audio-controls {
-        margin: 1.5rem auto 0;
-        text-align: center;
-    }
-
-    .audio-controls audio {
-        width: 100%;
-        max-width: 320px;
     }
 
     .status-grid {
@@ -287,8 +277,9 @@ try {
     .species-card img {
         display: block;
         width: 100%;
-        height: 180px;
+        height: 200px;
         object-fit: cover;
+        object-position: center top;
     }
 
     .species-card strong {
@@ -318,7 +309,7 @@ try {
         }
 
         .species-card img {
-            height: 140px;
+            height: 160px;
         }
     }
 </style>
@@ -327,7 +318,7 @@ try {
 <div class="container">
     <header>
         <h1>Welcome to <?php echo htmlspecialchars($config['site_name'], ENT_QUOTES, 'UTF-8'); ?></h1>
-        <p>Dive into SWG+ â€” the ultimate Star Wars Galaxies experience with custom content, curated events, and a passionate community ready to explore the stars with you.</p>
+        <p>Dive into SWG+ — the ultimate Star Wars Galaxies experience with custom content, curated events, and a passionate community ready to explore the stars with you.</p>
         <nav>
             <?php if (isAuthenticated()) : ?>
                 <span class="nav-greeting">Greetings, <?php echo htmlspecialchars(currentDisplayName(), ENT_QUOTES, 'UTF-8'); ?></span>
@@ -342,20 +333,10 @@ try {
                     <a href="/addnewuser.php">Join SWG+</a>
                 </div>
             <?php endif; ?>
-            <div class="nav-links">
-                <a href="/forums/index.php">Forums</a>
-                <a href="https://discord.gg" target="_blank" rel="noopener">Discord</a>
-            </div>
         </nav>
     </header>
 
     <main>
-        <div class="audio-controls">
-            <audio controls preload="none">
-                <source src="/music/Star Wars Main Theme.mp3" type="audio/mpeg">
-            </audio>
-        </div>
-
         <section class="status-grid">
             <div class="status-card">
                 <h2>Login Server</h2>
