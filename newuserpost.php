@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/includes/security.php';
 require_once __DIR__ . '/includes/db_connect.php';
 require_once __DIR__ . '/includes/auth_functions.php';
+require_once __DIR__ . '/includes/mailer.php';
 
 ensureSessionStarted();
 $config = require __DIR__ . '/includes/config.php';
@@ -124,8 +125,7 @@ For the Empire,
 {$config['site_name']} Security Team
 MAIL;
 
-$headers = 'From: ' . $config['mail_from'] . "\r\n" . 'Content-Type: text/plain; charset=UTF-8';
-$mailSent = @mail($email, $subject, $message, $headers);
+$mailSent = sendEmail($config, $email, $subject, $message, $username);
 
 renderResponse($config, [], $mailSent);
 exit;
