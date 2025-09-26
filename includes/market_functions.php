@@ -84,8 +84,10 @@ function fetchActiveListings(mysqli $db, ?string $search = null, ?string $catego
     $hasCategory = $categoryKey !== '' && array_key_exists($categoryKey, $categories);
 
     try {
+        $baseSelect = 'SELECT ml.id, ml.seller_id, ml.title, ml.category, ml.price, ml.currency, ml.contact_channel, ml.description, ml.status, ml.created_at, ua.username AS seller_name, ua.display_name FROM market_listings ml JOIN user_account ua ON ua.user_id = ml.seller_id';
+
         if ($searchTerm !== '' && $hasCategory) {
-            $stmt = $db->prepare('SELECT ml.id, ml.title, ml.category, ml.price, ml.currency, ml.contact_channel, ml.description, ml.status, ml.created_at, ua.username AS seller_name, ua.display_name FROM market_listings ml JOIN user_account ua ON ua.user_id = ml.seller_id WHERE ml.status = "active" AND (ml.title LIKE ? OR ml.description LIKE ?) AND ml.category = ? ORDER BY ml.created_at DESC LIMIT ?');
+            $stmt = $db->prepare($baseSelect . ' WHERE ml.status = "active" AND (ml.title LIKE ? OR ml.description LIKE ?) AND ml.category = ? ORDER BY ml.created_at DESC LIMIT ?');
             if ($stmt === false) {
                 return [];
             }
@@ -93,7 +95,7 @@ function fetchActiveListings(mysqli $db, ?string $search = null, ?string $catego
             $pattern = '%' . $searchTerm . '%';
             $stmt->bind_param('sssi', $pattern, $pattern, $categoryKey, $limit);
         } elseif ($searchTerm !== '') {
-            $stmt = $db->prepare('SELECT ml.id, ml.title, ml.category, ml.price, ml.currency, ml.contact_channel, ml.description, ml.status, ml.created_at, ua.username AS seller_name, ua.display_name FROM market_listings ml JOIN user_account ua ON ua.user_id = ml.seller_id WHERE ml.status = "active" AND (ml.title LIKE ? OR ml.description LIKE ?) ORDER BY ml.created_at DESC LIMIT ?');
+            $stmt = $db->prepare($baseSelect . ' WHERE ml.status = "active" AND (ml.title LIKE ? OR ml.description LIKE ?) ORDER BY ml.created_at DESC LIMIT ?');
             if ($stmt === false) {
                 return [];
             }
@@ -101,14 +103,14 @@ function fetchActiveListings(mysqli $db, ?string $search = null, ?string $catego
             $pattern = '%' . $searchTerm . '%';
             $stmt->bind_param('ssi', $pattern, $pattern, $limit);
         } elseif ($hasCategory) {
-            $stmt = $db->prepare('SELECT ml.id, ml.title, ml.category, ml.price, ml.currency, ml.contact_channel, ml.description, ml.status, ml.created_at, ua.username AS seller_name, ua.display_name FROM market_listings ml JOIN user_account ua ON ua.user_id = ml.seller_id WHERE ml.status = "active" AND ml.category = ? ORDER BY ml.created_at DESC LIMIT ?');
+            $stmt = $db->prepare($baseSelect . ' WHERE ml.status = "active" AND ml.category = ? ORDER BY ml.created_at DESC LIMIT ?');
             if ($stmt === false) {
                 return [];
             }
 
             $stmt->bind_param('si', $categoryKey, $limit);
         } else {
-            $stmt = $db->prepare('SELECT ml.id, ml.title, ml.category, ml.price, ml.currency, ml.contact_channel, ml.description, ml.status, ml.created_at, ua.username AS seller_name, ua.display_name FROM market_listings ml JOIN user_account ua ON ua.user_id = ml.seller_id WHERE ml.status = "active" ORDER BY ml.created_at DESC LIMIT ?');
+            $stmt = $db->prepare($baseSelect . ' WHERE ml.status = "active" ORDER BY ml.created_at DESC LIMIT ?');
             if ($stmt === false) {
                 return [];
             }
@@ -139,6 +141,31 @@ function fetchUserListings(mysqli $db, int $sellerId): array
         }
 
         $stmt->bind_param('i', $sellerId);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        $listings = [];
+        while ($row = $result->fetch_assoc()) {
+            $listings[] = $row;
+        }
+
+        return $listings;
+    } catch (Throwable $exception) {
+        return [];
+    }
+}
+
+function fetchActiveListingsBySeller(mysqli $db, int $sellerId, int $limit = 20): array
+{
+    $limit = max(1, min($limit, 50));
+
+    try {
+        $stmt = $db->prepare('SELECT id, title, category, price, currency, contact_channel, description, created_at FROM market_listings WHERE seller_id = ? AND status = "active" ORDER BY created_at DESC LIMIT ?');
+        if ($stmt === false) {
+            return [];
+        }
+
+        $stmt->bind_param('ii', $sellerId, $limit);
         $stmt->execute();
         $result = $stmt->get_result();
 
