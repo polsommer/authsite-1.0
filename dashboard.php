@@ -604,6 +604,46 @@ $alliesActive = $activeTab === 'allies';
                 width: 100%;
             }
         }
+
+        .admin-link {
+            margin-top: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.6rem;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #22d3ee, #0ea5e9);
+            color: #0f172a;
+            text-decoration: none;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            box-shadow: 0 16px 40px rgba(14, 165, 233, 0.35);
+        }
+
+        .admin-link:hover {
+            transform: translateY(-2px);
+        }
+
+        .market-link {
+            margin-top: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.65rem 1.4rem;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #fbbf24, #f97316);
+            color: #0f172a;
+            text-decoration: none;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            box-shadow: 0 16px 36px rgba(251, 191, 36, 0.3);
+        }
+
+        .market-link:hover {
+            transform: translateY(-1px);
+        }
     </style>
 </head>
 <body class="no-js">
@@ -617,6 +657,12 @@ $alliesActive = $activeTab === 'allies';
                     <span>Local Time: <?php echo htmlspecialchars($localTime, ENT_QUOTES, 'UTF-8'); ?></span>
                 <?php endif; ?>
                 <span>Access Level: <?php echo htmlspecialchars($accessLevel, ENT_QUOTES, 'UTF-8'); ?></span>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+                <a class="market-link" href="/market.php">Browse the Holonet Exchange</a>
+                <?php if (hasAccessLevel('admin', 'superadmin')) : ?>
+                    <a class="admin-link" href="/admin.php">Open Operations Command</a>
+                <?php endif; ?>
             </div>
         </header>
 
