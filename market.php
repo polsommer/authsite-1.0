@@ -102,6 +102,55 @@ $myListings = fetchUserListings($mysqli, (int) $userId);
 $summary = summarizeMarketplace($mysqli);
 $csrfToken = getCsrfToken();
 
+$priceValues = [];
+foreach ($activeListings as $listing) {
+    $priceValues[] = isset($listing['price']) ? (float) $listing['price'] : 0.0;
+}
+$priceValues = array_filter($priceValues, static fn($price) => $price >= 0);
+$minPrice = !empty($priceValues) ? floor(min($priceValues)) : 0;
+$maxPrice = !empty($priceValues) ? ceil(max($priceValues)) : 0;
+
+$categoryCounts = [];
+foreach ($activeListings as $listing) {
+    $categoryKey = (string) ($listing['category'] ?? '');
+    if ($categoryKey === '') {
+        continue;
+    }
+    if (!isset($categoryCounts[$categoryKey])) {
+        $categoryCounts[$categoryKey] = 0;
+    }
+    $categoryCounts[$categoryKey]++;
+}
+arsort($categoryCounts);
+$popularCategories = array_slice(array_keys($categoryCounts), 0, 3);
+$popularDisplay = [];
+foreach ($popularCategories as $categoryKey) {
+    $popularDisplay[] = [
+        'label' => $categories[$categoryKey] ?? ucwords(str_replace('_', ' ', $categoryKey)),
+        'count' => $categoryCounts[$categoryKey] ?? 0,
+    ];
+}
+
+$holonetPrompts = [
+    'Host a pop-up bazaar night and invite other guilds.',
+    'Bundle your services and offer a flash deal for 15 minutes.',
+    'Challenge another merchant to a friendly haggling duel.',
+    'Create a scavenger hunt that ends at your vendor stall.',
+    'Offer a bonus crafting session for anyone who trades today.',
+    'Hide a secret discount code in your listing description.',
+];
+shuffle($holonetPrompts);
+$holonetPrompts = array_slice($holonetPrompts, 0, 3);
+
+$socialMiniGames = [
+    'Spin the datapad and compliment the next trader you see.',
+    'Form a resource caravan with two other sellers for extra fun.',
+    'Swap a random buff with someone new and screenshot the moment.',
+    'Trade jokes in cantina chat before finalizing the deal.',
+];
+shuffle($socialMiniGames);
+$socialMiniGames = array_slice($socialMiniGames, 0, 2);
+
 function formatListingDate(?string $value): string
 {
     if (!$value) {
@@ -229,6 +278,9 @@ function formatListingDate(?string $value): string
             grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
             gap: 1.25rem;
         }
+        .hidden {
+            display: none !important;
+        }
         .listing-card {
             background: rgba(12, 74, 110, 0.25);
             border: 1px solid rgba(56, 189, 248, 0.3);
@@ -252,6 +304,11 @@ function formatListingDate(?string $value): string
             gap: 0.5rem;
             flex-wrap: wrap;
         }
+        .listing-card .meta .label {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
         .listing-card .price {
             font-weight: bold;
             color: #fbbf24;
@@ -265,6 +322,115 @@ function formatListingDate(?string $value): string
         .listing-card .contact {
             font-size: 0.85rem;
             color: rgba(94, 234, 212, 0.9);
+        }
+        .listing-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .listing-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            padding: 0.5rem 0.85rem;
+            border-radius: 999px;
+            border: 1px solid rgba(94, 234, 212, 0.35);
+            background: rgba(8, 47, 73, 0.65);
+            color: #f8fafc;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            cursor: pointer;
+            text-decoration: none;
+            transition: transform 0.15s ease, box-shadow 0.2s ease;
+        }
+        .listing-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 24px rgba(45, 212, 191, 0.25);
+            border-color: rgba(94, 234, 212, 0.7);
+        }
+        .listing-button.sent {
+            opacity: 0.85;
+        }
+        .copy-contact {
+            background: rgba(15, 118, 110, 0.55);
+            border-color: rgba(34, 197, 94, 0.45);
+        }
+        .profile-link {
+            background: rgba(14, 116, 144, 0.5);
+            border-color: rgba(59, 130, 246, 0.45);
+        }
+        .cheer-button {
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.85), rgba(251, 146, 60, 0.85));
+            border-color: rgba(251, 191, 36, 0.6);
+            color: #1f2937;
+        }
+        .cheer-button.sent {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.8), rgba(14, 165, 233, 0.8));
+            border-color: rgba(125, 211, 252, 0.7);
+        }
+        .price-filter {
+            display: grid;
+            gap: 0.75rem;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            margin-bottom: 1.25rem;
+            background: rgba(8, 47, 73, 0.4);
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            border-radius: 14px;
+            padding: 0.9rem;
+        }
+        .price-filter label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(148, 163, 184, 0.85);
+            margin-bottom: 0.25rem;
+        }
+        .price-filter input {
+            width: 100%;
+            padding: 0.6rem;
+            border-radius: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            background: rgba(15, 23, 42, 0.9);
+            color: #f8fafc;
+        }
+        .price-filter .filter-description {
+            grid-column: 1 / -1;
+            font-size: 0.8rem;
+            color: rgba(148, 163, 184, 0.85);
+            margin: 0;
+        }
+        .holonet-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+        .holonet-card {
+            background: rgba(12, 74, 110, 0.25);
+            border-radius: 16px;
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            padding: 1.1rem 1.25rem;
+            color: rgba(226, 232, 240, 0.9);
+            box-shadow: 0 14px 34px rgba(14, 116, 144, 0.2);
+        }
+        .holonet-card h3 {
+            margin-top: 0;
+            color: #5eead4;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            font-size: 0.95rem;
+        }
+        .holonet-card ul {
+            margin: 0.6rem 0 0 1rem;
+            padding: 0;
+            display: grid;
+            gap: 0.5rem;
+        }
+        .holonet-card li {
+            font-size: 0.9rem;
         }
         form.search-form {
             display: grid;
@@ -417,22 +583,43 @@ function formatListingDate(?string $value): string
                     <button type="submit">Scan Holonet</button>
                 </form>
 
+                <?php if ($maxPrice > 0): ?>
+                    <div class="price-filter" data-min="<?php echo htmlspecialchars((string) $minPrice, ENT_QUOTES, 'UTF-8'); ?>" data-max="<?php echo htmlspecialchars((string) $maxPrice, ENT_QUOTES, 'UTF-8'); ?>">
+                        <div>
+                            <label for="min-price">Min price</label>
+                            <input type="number" id="min-price" min="0" step="1" placeholder="<?php echo htmlspecialchars(number_format((float) $minPrice, 0), ENT_QUOTES, 'UTF-8'); ?>">
+                        </div>
+                        <div>
+                            <label for="max-price">Max price</label>
+                            <input type="number" id="max-price" min="0" step="1" placeholder="<?php echo htmlspecialchars(number_format((float) $maxPrice, 0), ENT_QUOTES, 'UTF-8'); ?>">
+                        </div>
+                        <p class="filter-description">Filter results instantly by price to find the perfect trade within your budget.</p>
+                    </div>
+                <?php endif; ?>
+
                 <?php if (count($activeListings) === 0): ?>
                     <p style="color: rgba(148, 163, 184, 0.9);">No listings yet. Be the first to advertise your services!</p>
                 <?php else: ?>
                     <div class="listing-grid">
                         <?php foreach ($activeListings as $listing): ?>
-                            <article class="listing-card">
+                            <article class="listing-card" data-price="<?php echo htmlspecialchars((string) ($listing['price'] ?? 0), ENT_QUOTES, 'UTF-8'); ?>" data-category="<?php echo htmlspecialchars((string) ($listing['category'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>" data-listing-id="<?php echo (int) ($listing['id'] ?? 0); ?>" data-seller-id="<?php echo (int) ($listing['seller_id'] ?? 0); ?>">
                                 <h3><?php echo htmlspecialchars((string) ($listing['title'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></h3>
                                 <div class="meta">
                                     <span><?php echo htmlspecialchars($categories[$listing['category']] ?? ucfirst((string) $listing['category']), ENT_QUOTES, 'UTF-8'); ?></span>
                                     <span class="price"><?php echo htmlspecialchars(number_format((float) ($listing['price'] ?? 0), 2), ENT_QUOTES, 'UTF-8'); ?> <?php echo htmlspecialchars((string) ($listing['currency'] ?? 'CREDITS'), ENT_QUOTES, 'UTF-8'); ?></span>
                                 </div>
                                 <p><?php echo nl2br(htmlspecialchars((string) ($listing['description'] ?? ''), ENT_QUOTES, 'UTF-8')); ?></p>
-                                <p class="contact">Contact: <?php echo htmlspecialchars((string) ($listing['contact_channel'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></p>
+                                <p class="contact">Contact: <span class="contact-value"><?php echo htmlspecialchars((string) ($listing['contact_channel'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></span></p>
                                 <div class="meta" style="font-size: 0.8rem;">
-                                    <span>Merchant: <?php echo htmlspecialchars((string) ($listing['display_name'] ?: $listing['seller_name']), ENT_QUOTES, 'UTF-8'); ?></span>
-                                    <span>Posted <?php echo htmlspecialchars(formatListingDate($listing['created_at'] ?? null), ENT_QUOTES, 'UTF-8'); ?></span>
+                                    <span class="label">Merchant: <?php echo htmlspecialchars((string) ($listing['display_name'] ?: $listing['seller_name']), ENT_QUOTES, 'UTF-8'); ?></span>
+                                    <span class="label">Posted <?php echo htmlspecialchars(formatListingDate($listing['created_at'] ?? null), ENT_QUOTES, 'UTF-8'); ?></span>
+                                </div>
+                                <div class="listing-actions">
+                                    <button type="button" class="listing-button copy-contact">Copy Contact</button>
+                                    <button type="button" class="listing-button cheer-button">Send Cheer</button>
+                                    <?php if (($listing['seller_id'] ?? 0) > 0): ?>
+                                        <a class="listing-button profile-link" href="/profile_view.php?user_id=<?php echo (int) ($listing['seller_id'] ?? 0); ?>">View Profile</a>
+                                    <?php endif; ?>
                                 </div>
                             </article>
                         <?php endforeach; ?>
@@ -459,7 +646,40 @@ function formatListingDate(?string $value): string
                     </div>
                 <?php endif; ?>
             </section>
-        <?php elseif ($activeTab === 'sell'): ?>
+            <section class="panel">
+                <h2 style="margin-top: 0; color: #5eead4;">Holonet Hangouts</h2>
+                <div class="holonet-grid">
+                    <div class="holonet-card">
+                        <h3>Make the Market Pop</h3>
+                        <ul>
+                            <?php foreach ($holonetPrompts as $prompt): ?>
+                                <li><?php echo htmlspecialchars($prompt, ENT_QUOTES, 'UTF-8'); ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                    <div class="holonet-card">
+                        <h3>Party Starters</h3>
+                        <ul>
+                            <?php foreach ($socialMiniGames as $miniGame): ?>
+                                <li><?php echo htmlspecialchars($miniGame, ENT_QUOTES, 'UTF-8'); ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
+                    <div class="holonet-card">
+                        <h3>Hot Categories</h3>
+                        <?php if (empty($popularDisplay)): ?>
+                            <p style="margin: 0; font-size: 0.9rem; color: rgba(148, 163, 184, 0.85);">Your listing could claim the spotlight. Post something legendary!</p>
+                        <?php else: ?>
+                            <ul>
+                                <?php foreach ($popularDisplay as $popular): ?>
+                                    <li><?php echo htmlspecialchars((string) $popular['label'], ENT_QUOTES, 'UTF-8'); ?> <span style="color: #facc15;">&times;<?php echo (int) $popular['count']; ?></span></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </section>
+<?php elseif ($activeTab === 'sell'): ?>
             <section class="panel">
                 <h2 style="margin-top: 0; color: #38bdf8;">Advertise Your Offering</h2>
                 <form method="post" action="/market.php?tab=sell">
@@ -543,5 +763,106 @@ function formatListingDate(?string $value): string
             </section>
         <?php endif; ?>
     </main>
+    <script>
+        const priceFilter = document.querySelector('.price-filter');
+        if (priceFilter) {
+            const minInput = document.getElementById('min-price');
+            const maxInput = document.getElementById('max-price');
+            const baseMin = parseFloat(priceFilter.dataset.min || '0');
+            const baseMax = parseFloat(priceFilter.dataset.max || '0');
+            const listingCards = Array.from(document.querySelectorAll('.listing-grid .listing-card'));
+
+            const applyPriceFilter = () => {
+                const minValue = minInput && minInput.value !== '' ? parseFloat(minInput.value) : baseMin;
+                const maxValue = maxInput && maxInput.value !== '' ? parseFloat(maxInput.value) : baseMax;
+                listingCards.forEach(card => {
+                    const price = parseFloat(card.dataset.price || '0');
+                    const isVisible = price >= minValue && price <= maxValue;
+                    card.classList.toggle('hidden', !isVisible);
+                });
+            };
+
+            if (minInput) {
+                minInput.addEventListener('input', applyPriceFilter);
+            }
+            if (maxInput) {
+                maxInput.addEventListener('input', applyPriceFilter);
+            }
+
+            applyPriceFilter();
+        }
+
+        const contactButtons = document.querySelectorAll('.listing-card .copy-contact');
+        contactButtons.forEach(button => {
+            button.addEventListener('click', async () => {
+                const card = button.closest('.listing-card');
+                if (!card) {
+                    return;
+                }
+                const contactValue = card.querySelector('.contact-value');
+                const text = contactValue ? contactValue.textContent.trim() : '';
+                if (!text) {
+                    return;
+                }
+                try {
+                    await navigator.clipboard.writeText(text);
+                    const original = button.textContent;
+                    button.textContent = 'Contact copied!';
+                    button.classList.add('sent');
+                    setTimeout(() => {
+                        button.textContent = original;
+                        button.classList.remove('sent');
+                    }, 2200);
+                } catch (error) {
+                    alert('Unable to copy contact details.');
+                }
+            });
+        });
+
+        const cheerButtons = document.querySelectorAll('.listing-card .cheer-button');
+        cheerButtons.forEach(button => {
+            const card = button.closest('.listing-card');
+            if (!card) {
+                return;
+            }
+            const listingId = card.dataset.listingId;
+            if (!listingId) {
+                return;
+            }
+            const cheerKey = `holonet-cheer-${listingId}`;
+            if (window.localStorage.getItem(cheerKey)) {
+                button.classList.add('sent');
+                button.textContent = 'Cheered!';
+            }
+
+            button.addEventListener('click', () => {
+                if (button.classList.contains('sent')) {
+                    return;
+                }
+                button.classList.add('sent');
+                button.textContent = 'Cheered!';
+                window.localStorage.setItem(cheerKey, '1');
+
+                const spark = document.createElement('div');
+                spark.textContent = '🎉';
+                spark.style.position = 'absolute';
+                spark.style.fontSize = '1.6rem';
+                spark.style.pointerEvents = 'none';
+                spark.style.transform = 'translate(-50%, -50%)';
+                spark.style.zIndex = '9999';
+                spark.style.opacity = '1';
+                const rect = button.getBoundingClientRect();
+                spark.style.left = `${rect.left + rect.width / 2}px`;
+                spark.style.top = `${rect.top}px`;
+                spark.style.transition = 'all 0.8s ease-out';
+                document.body.appendChild(spark);
+                requestAnimationFrame(() => {
+                    spark.style.opacity = '0';
+                    spark.style.transform = 'translate(-50%, -150%) scale(0.8)';
+                });
+                setTimeout(() => spark.remove(), 800);
+            });
+        });
+    </script>
 </body>
 </html>
