@@ -604,6 +604,26 @@ $alliesActive = $activeTab === 'allies';
                 width: 100%;
             }
         }
+
+        .admin-link {
+            margin-top: 1.25rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.6rem;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #22d3ee, #0ea5e9);
+            color: #0f172a;
+            text-decoration: none;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            box-shadow: 0 16px 40px rgba(14, 165, 233, 0.35);
+        }
+
+        .admin-link:hover {
+            transform: translateY(-2px);
+        }
     </style>
 </head>
 <body class="no-js">
@@ -618,6 +638,9 @@ $alliesActive = $activeTab === 'allies';
                 <?php endif; ?>
                 <span>Access Level: <?php echo htmlspecialchars($accessLevel, ENT_QUOTES, 'UTF-8'); ?></span>
             </div>
+            <?php if (hasAccessLevel('admin', 'superadmin')) : ?>
+                <a class="admin-link" href="/admin.php">Open Operations Command</a>
+            <?php endif; ?>
         </header>
 
         <nav class="tab-nav" role="tablist" aria-label="Dashboard sections">

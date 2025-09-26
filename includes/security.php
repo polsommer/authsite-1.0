@@ -98,6 +98,114 @@ function currentDisplayName(): string
     return $username !== '' ? $username : 'Pilot';
 }
 
+function currentAccessLevel(): string
+{
+    ensureSessionStarted();
+
+    $level = strtolower(trim((string) ($_SESSION['accesslevel'] ?? 'standard')));
+
+    return $level !== '' ? $level : 'standard';
+}
+
+function hasAccessLevel(string ...$levels): bool
+{
+    if (empty($levels)) {
+        return false;
+    }
+
+    $current = currentAccessLevel();
+
+    foreach ($levels as $level) {
+        if (strtolower(trim($level)) === $current) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function requireAccessLevel(array $levels, ?string $intendedUrl = null): void
+{
+    requireAuthenticatedUser($intendedUrl);
+
+    if (empty($levels)) {
+        return;
+    }
+
+    $normalized = array_map(static fn ($level) => strtolower(trim((string) $level)), $levels);
+
+    if (!in_array(currentAccessLevel(), $normalized, true)) {
+        http_response_code(403);
+        ?>
+        <!doctype html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Access Denied</title>
+            <link rel="stylesheet" href="/stylesheet.css">
+            <style>
+                body {
+                    margin: 0;
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background: radial-gradient(circle at top, rgba(15, 23, 42, 0.95) 0%, rgba(2, 6, 23, 0.95) 45%, rgba(0, 0, 0, 0.98) 100%), url('/images/stormtrooper.jpg') no-repeat center/cover fixed;
+                    color: #e2e8f0;
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    text-align: center;
+                    padding: 2rem;
+                }
+
+                .denied-card {
+                    max-width: 520px;
+                    width: 100%;
+                    background: rgba(15, 23, 42, 0.92);
+                    border-radius: 18px;
+                    padding: 2.5rem 2rem;
+                    box-shadow: 0 25px 60px rgba(2, 6, 23, 0.65);
+                    border: 1px solid rgba(148, 163, 184, 0.25);
+                }
+
+                h1 {
+                    margin: 0 0 1rem;
+                    letter-spacing: 0.15em;
+                    text-transform: uppercase;
+                    font-size: 1.75rem;
+                }
+
+                p {
+                    margin-bottom: 2rem;
+                    line-height: 1.6;
+                }
+
+                a.button {
+                    display: inline-block;
+                    padding: 0.75rem 2.5rem;
+                    border-radius: 999px;
+                    background: linear-gradient(135deg, #22d3ee, #0ea5e9);
+                    color: #0f172a;
+                    text-decoration: none;
+                    font-weight: 600;
+                    letter-spacing: 0.08em;
+                    text-transform: uppercase;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="denied-card">
+                <h1>Access Restricted</h1>
+                <p>Your credentials do not grant access to this command console. If you believe this is an error, contact a super admin to review your clearance.</p>
+                <a class="button" href="/dashboard.php">Return to Dashboard</a>
+            </div>
+        </body>
+        </html>
+        <?php
+        exit;
+    }
+}
+
 function currentIpAddress(): string
 {
     $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
